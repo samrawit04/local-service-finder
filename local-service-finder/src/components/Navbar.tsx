@@ -2,16 +2,16 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
-  LogOut, Home, Compass, LayoutDashboard,
-  Settings, UserCircle, UserCog, ChevronDown, Briefcase as BriefcaseIcon
+    LogOut, Home, Compass, LayoutDashboard,
+    Settings, UserCircle, UserCog, ChevronDown, Briefcase as BriefcaseIcon
 } from "lucide-react";
 
 export default function Navbar() {
-    const { user, logout }  = useAuth();
-    const navigate          = useNavigate();
-    const location          = useLocation();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
     const [menuOpen, setMenuOpen] = useState(false);
-    const menuRef           = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
     const handleLogout = () => {
         logout();
@@ -66,13 +66,7 @@ export default function Navbar() {
                                 </span>
                             </Link>
                         )}
-                        {user?.role === "Provider" && (
-                            <Link to="/provider/setup" className={isActive("/provider/setup")}>
-                                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                    <Settings size={16} /> <span className="nav-link-text">My Services</span>
-                                </span>
-                            </Link>
-                        )}
+
                     </div>
 
                     <div className="nav-auth-section">
