@@ -32,7 +32,7 @@ export default function Providers() {
                 <div className="container">
                     <div className="hero-section" style={{ padding: "120px 28px 80px" }}>
                         <div className="hero-pill">
-                            <Zap size={14} /> ባለሙያ አገልግሎት — Trusted Professionals Near You
+                            <Zap size={14} /> LocalFinder - አሰሪና ሰራተኛ አገናኝ!
                         </div>
                         <h1 className="hero-title">
                             Find the right person<br />
@@ -69,23 +69,22 @@ export default function Providers() {
                 {/* ── Stats strip ── */}
                 <div style={{
                     display: "flex",
-                    justifyContent: "flex-start",
+                    justifyContent: "center",
                     alignItems: "center",
                     gap: 48,
-                    margin: "48px 0 64px",
-                    maxWidth: 700,
+                    margin: "48px auto 64px",
                     flexWrap: "wrap",
                 }}>
                     {[
-                        { icon: <Users size={20} />,    value: "500+",  label: "Verified Providers" },
-                        { icon: <Calendar size={20} />, value: "10k+",  label: "Jobs Completed" },
-                        { icon: <Star size={20} />,     value: "4.8★",  label: "Average Rating" },
-                        { icon: <Award size={20} />,    value: "24hrs", label: "Avg. Response Time" },
+                        { icon: <Users size={20} />, value: "500+", label: "Verified Providers" },
+                        { icon: <Calendar size={20} />, value: "10k+", label: "Jobs Completed" },
+                        { icon: <Star size={20} />, value: "4.8★", label: "Average Rating" },
+                        { icon: <Award size={20} />, value: "24hrs", label: "Avg. Response Time" },
                     ].map((stat, i) => (
                         <div
                             key={i}
                             className={`anim-fade anim-delay${i + 1}`}
-                            style={{ textAlign: "center", minWidth: 100 }}
+                            style={{ textAlign: "center", minWidth: 120 }}
                         >
                             <div style={{ color: "var(--accent)", marginBottom: 6, display: "flex", justifyContent: "center" }}>
                                 {stat.icon}

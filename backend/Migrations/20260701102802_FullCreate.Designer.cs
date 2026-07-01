@@ -12,8 +12,8 @@ using backend.Data;
 namespace backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260610134500_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260701102802_FullCreate")]
+    partial class FullCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -59,6 +59,81 @@ namespace backend.Migrations
                     b.HasIndex("ServiceId");
 
                     b.ToTable("Bookings");
+                });
+
+            modelBuilder.Entity("backend.Models.JobApplication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AppliedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CoverNote")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("JobPostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProviderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobPostId");
+
+                    b.HasIndex("ProviderId");
+
+                    b.ToTable("JobApplications");
+                });
+
+            modelBuilder.Entity("backend.Models.JobPost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Budget")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.ToTable("JobPosts");
                 });
 
             modelBuilder.Entity("backend.Models.Review", b =>
@@ -217,6 +292,36 @@ namespace backend.Migrations
                     b.Navigation("Service");
                 });
 
+            modelBuilder.Entity("backend.Models.JobApplication", b =>
+                {
+                    b.HasOne("backend.Models.JobPost", "JobPost")
+                        .WithMany("Applications")
+                        .HasForeignKey("JobPostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("backend.Models.ServiceProvider", "Provider")
+                        .WithMany()
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("JobPost");
+
+                    b.Navigation("Provider");
+                });
+
+            modelBuilder.Entity("backend.Models.JobPost", b =>
+                {
+                    b.HasOne("backend.Models.User", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+                });
+
             modelBuilder.Entity("backend.Models.Review", b =>
                 {
                     b.HasOne("backend.Models.Booking", "Booking")
@@ -247,7 +352,7 @@ namespace backend.Migrations
             modelBuilder.Entity("backend.Models.Service", b =>
                 {
                     b.HasOne("backend.Models.ServiceProvider", "Provider")
-                        .WithMany()
+                        .WithMany("Services")
                         .HasForeignKey("ProviderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -264,6 +369,16 @@ namespace backend.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("backend.Models.JobPost", b =>
+                {
+                    b.Navigation("Applications");
+                });
+
+            modelBuilder.Entity("backend.Models.ServiceProvider", b =>
+                {
+                    b.Navigation("Services");
                 });
 #pragma warning restore 612, 618
         }

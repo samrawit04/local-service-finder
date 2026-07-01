@@ -1,41 +1,86 @@
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import { Settings, PlusCircle, CheckCircle, Briefcase, MapPin, Phone, Image, Tag, FileText, AlignLeft } from "lucide-react";
+import {
+  Settings, Briefcase, Phone,
+  AlignLeft, Upload, Globe, MapPin, Home
+} from "lucide-react";
+
+// ── Ethiopian cities list ──
+const ETHIOPIAN_CITIES = [
+  "Addis Ababa", "Dire Dawa", "Mekelle", "Gondar", "Bahir Dar",
+  "Hawassa", "Adama (Nazret)", "Dessie", "Jimma", "Jijiga",
+  "Shashamane", "Bishoftu (Debre Zeit)", "Sodo", "Arba Minch",
+  "Hosaena", "Harar", "Dilla", "Nekemte", "Asella", "Axum",
+];
+
+// ── Country list (Ethiopia first, then alphabetical) ──
+const COUNTRIES = [
+  "Ethiopia",
+  "Afghanistan", "Albania", "Algeria", "Angola", "Argentina", "Australia",
+  "Austria", "Bahrain", "Bangladesh", "Belgium", "Brazil", "Canada",
+  "China", "Colombia", "Croatia", "Czech Republic", "Denmark", "Djibouti",
+  "Egypt", "Eritrea", "Finland", "France", "Germany", "Ghana", "Greece",
+  "Hungary", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel",
+  "Italy", "Ivory Coast", "Japan", "Jordan", "Kenya", "Kuwait",
+  "Lebanon", "Libya", "Malaysia", "Mali", "Mexico", "Morocco",
+  "Netherlands", "New Zealand", "Nigeria", "Norway", "Oman",
+  "Pakistan", "Philippines", "Poland", "Portugal", "Qatar",
+  "Romania", "Russia", "Rwanda", "Saudi Arabia", "Senegal",
+  "Singapore", "Somalia", "South Africa", "South Korea", "South Sudan",
+  "Spain", "Sudan", "Sweden", "Switzerland", "Syria", "Tanzania",
+  "Thailand", "Tunisia", "Turkey", "UAE", "Uganda", "UK",
+  "Ukraine", "USA", "Vietnam", "Yemen", "Zimbabwe",
+];
 
 export default function ProviderSetup() {
-  const { user }      = useAuth();
-  const navigate      = useNavigate();
-  const [step, setStep]   = useState<1|2>(1);
-  const [loading, setLoading] = useState(false);
-  const [services, setServices] = useState<{ title:string; category:string; description:string }[]>([]);
+  const { user }    = useAuth();
+  const navigate    = useNavigate();
+  const [loading, setLoading]   = useState(false);
 
-  // Profile state
-  const [bio, setBio]               = useState("");
-  const [location, setLocation]     = useState("");
-  const [phone, setPhone]           = useState("");
-  const [profileImage, setImage]    = useState("");
+  // ── Profile fields ──
+  const [bio, setBio]                 = useState("");
+  const [country, setCountry]         = useState("Ethiopia");
+  const [city, setCity]               = useState("");
+  const [specificAddress, setSpecificAddress] = useState("");
+  const [phone, setPhone]             = useState("");
 
-  // Service form state
-  const [sTitle, setSTitle] = useState("");
-  const [sCat,   setSCat]   = useState("");
-  const [sDesc,  setSDesc]  = useState("");
+  // ── Profile picture upload ──
+  const [imageFile, setImageFile]     = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const fileInputRef                  = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user && user.role !== "Provider") navigate("/dashboard");
   }, [user, navigate]);
 
+  // Convert file to base64 for sending to API
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image must be under 2 MB.");
+      return;
+    }
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
   const handleProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    const location = [specificAddress, city, country].filter(Boolean).join(", ");
+    // Use base64 data URL as the profile image (or empty)
+    const profileImage = imagePreview || "";
     try {
       await api.post("/Providers", { bio, location, phone, profileImage });
-      setStep(2);
+      navigate("/providers");
     } catch (err: any) {
-      // might already exist — allow moving on
-      if (err.response?.data?.includes("already exists")) {
-        setStep(2);
+      if (err.response?.data?.includes?.("already exists")) {
+        navigate("/providers");
       } else {
         alert(err.response?.data || "Failed to save profile. Please try again.");
       }
@@ -43,25 +88,6 @@ export default function ProviderSetup() {
       setLoading(false);
     }
   };
-
-  const handleAddService = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await api.post("/Services", { title: sTitle, category: sCat, description: sDesc });
-      setServices(prev => [...prev, { title: sTitle, category: sCat, description: sDesc }]);
-      setSTitle(""); setSCat(""); setSDesc("");
-    } catch (err: any) {
-      alert(err.response?.data || "Failed to add service.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const steps = [
-    { num:1, label:"Create Profile" },
-    { num:2, label:"Add Services"  },
-  ];
 
   return (
     <div className="page-wrap">
@@ -73,129 +99,181 @@ export default function ProviderSetup() {
             <Briefcase size={28} color="#fff"/>
           </div>
           <h1 style={{ fontSize:36, fontWeight:800, marginBottom:12 }}>Provider Setup</h1>
-          <p>Complete your profile and add services to start receiving bookings.</p>
+          <p>Complete your profile to start receiving bookings.</p>
         </div>
 
-        {/* ── Step indicator ── */}
-        <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:0, marginBottom:48 }}>
-          {steps.map((s, i) => (
-            <>
-              <div key={s.num} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
-                <div className={`step-dot ${step > s.num ? "done" : step === s.num ? "active" : "idle"}`}>
-                  {step > s.num ? <CheckCircle size={18}/> : s.num}
+        {/* ── Profile Form ── */}
+        <div className="card card-pad anim-fade">
+          <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:"linear-gradient(90deg,var(--accent),var(--accent-2))", borderRadius:"14px 14px 0 0" }} />
+          <h2 style={{ fontSize:22, marginBottom:28, display:"flex", alignItems:"center", gap:10 }}>
+            <Settings size={22} color="var(--accent)"/> Your Provider Profile
+          </h2>
+
+          <form onSubmit={handleProfile}>
+
+            {/* ── Profile Picture Upload ── */}
+            <div className="form-group" style={{ marginBottom:28 }}>
+              <label className="form-label"><Upload size={13}/> Profile Photo</label>
+              <div style={{ display:"flex", alignItems:"center", gap:20 }}>
+                {/* Avatar preview */}
+                <div
+                  style={{
+                    width:88, height:88, borderRadius:"50%", flexShrink:0,
+                    background: imagePreview ? "none" : "linear-gradient(135deg,var(--accent),var(--accent-2))",
+                    border:"3px solid rgba(108,99,255,.3)",
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    overflow:"hidden", cursor:"pointer", transition:"border-color .2s"
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Click to upload photo"
+                >
+                  {imagePreview
+                    ? <img src={imagePreview} alt="Preview" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                    : <Upload size={26} color="rgba(255,255,255,.7)" />
+                  }
                 </div>
-                <span style={{ fontSize:12, fontWeight:600, color: step === s.num ? "#fff" : "var(--text-muted)" }}>{s.label}</span>
-              </div>
-              {i < steps.length - 1 && (
-                <div style={{ width:80, height:2, background: step > s.num ? "var(--green)" : "var(--border)", margin:"0 16px", marginBottom:24, transition:"background .4s" }} />
-              )}
-            </>
-          ))}
-        </div>
-
-        {/* ── STEP 1: Profile ── */}
-        {step === 1 && (
-          <div className="card card-pad anim-fade">
-            <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:"linear-gradient(90deg,var(--accent),var(--accent-2))", borderRadius:"14px 14px 0 0" }} />
-            <h2 style={{ fontSize:22, marginBottom:28, display:"flex", alignItems:"center", gap:10 }}>
-              <Settings size={22} color="var(--accent)"/> Your Provider Profile
-            </h2>
-
-            <form onSubmit={handleProfile}>
-              <div className="form-group">
-                <label className="form-label"><AlignLeft size={13}/> Bio / About you</label>
-                <textarea className="form-input" rows={4} placeholder="Tell customers about your skills and experience…" value={bio} onChange={e => setBio(e.target.value)} required style={{ resize:"vertical" }} />
-              </div>
-
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-                <div className="form-group">
-                  <label className="form-label"><MapPin size={13}/> Location</label>
-                  <input type="text" className="form-input" placeholder="e.g. New York, NY" value={location} onChange={e => setLocation(e.target.value)} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label"><Phone size={13}/> Phone number</label>
-                  <input type="tel" className="form-input" placeholder="+1 555 000 0000" value={phone} onChange={e => setPhone(e.target.value)} required />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label"><Image size={13}/> Profile photo URL <span style={{ color:"var(--text-faint)", textTransform:"none", letterSpacing:0 }}>(optional)</span></label>
-                <input type="url" className="form-input" placeholder="https://example.com/photo.jpg" value={profileImage} onChange={e => setImage(e.target.value)} />
-              </div>
-
-              <button type="submit" className="btn btn-primary" style={{ width:"100%", padding:14, fontSize:15, marginTop:8 }} disabled={loading}>
-                {loading
-                  ? <span style={{ display:"flex", gap:8, alignItems:"center" }}><span style={{ width:16, height:16, borderRadius:"50%", border:"2px solid rgba(255,255,255,.3)", borderTopColor:"#fff", animation:"spin-slow .7s linear infinite", display:"inline-block" }} /> Saving…</span>
-                  : "Save Profile & Continue →"
-                }
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* ── STEP 2: Services ── */}
-        {step === 2 && (
-          <div className="anim-fade" style={{ display:"grid", gap:24 }}>
-            {/* Success banner */}
-            <div className="alert alert-success" style={{ alignItems:"center" }}>
-              <CheckCircle size={20} style={{ flexShrink:0 }}/> Profile saved! Now add the services you offer.
-            </div>
-
-            {/* Services added so far */}
-            {services.length > 0 && (
-              <div>
-                <h3 style={{ fontSize:16, marginBottom:14, color:"#fff" }}>Services added ({services.length})</h3>
-                <div style={{ display:"grid", gap:10 }}>
-                  {services.map((s, i) => (
-                    <div key={i} className="card card-pad anim-fade" style={{ padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <div>
-                        <div style={{ fontWeight:600, color:"#fff", marginBottom:2 }}>{s.title}</div>
-                        <div style={{ fontSize:13, color:"var(--text-muted)" }}>{s.description}</div>
-                      </div>
-                      <span className="badge badge-accent">{s.category}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Add service form */}
-            <div className="card card-pad">
-              <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:"linear-gradient(90deg,var(--teal),var(--accent))", borderRadius:"14px 14px 0 0" }} />
-              <h2 style={{ fontSize:22, marginBottom:28, display:"flex", alignItems:"center", gap:10 }}>
-                <PlusCircle size={22} color="var(--accent)"/> Add a Service
-              </h2>
-
-              <form onSubmit={handleAddService}>
-                <div className="form-group">
-                  <label className="form-label"><FileText size={13}/> Service title</label>
-                  <input type="text" className="form-input" placeholder="e.g. Premium Pipe Repair" value={sTitle} onChange={e => setSTitle(e.target.value)} required />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label"><Tag size={13}/> Category</label>
-                  <input type="text" className="form-input" placeholder="e.g. Plumbing, Electrical, Cleaning…" value={sCat} onChange={e => setSCat(e.target.value)} required />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label"><AlignLeft size={13}/> Description</label>
-                  <textarea className="form-input" rows={3} placeholder="Describe what's included in this service…" value={sDesc} onChange={e => setSDesc(e.target.value)} required style={{ resize:"vertical" }} />
-                </div>
-
-                <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
-                  <button type="submit" className="btn btn-primary" style={{ flex:1, padding:13 }} disabled={loading}>
-                    {loading ? "Adding…" : <><PlusCircle size={16}/> Add Service</>}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="btn btn-ghost"
+                    style={{ padding:"8px 18px", fontSize:13, marginBottom:8 }}
+                  >
+                    {imageFile ? "Change photo" : "Choose from PC"}
                   </button>
-                  {services.length > 0 && (
-                    <button type="button" className="btn btn-ghost" onClick={() => navigate("/dashboard")} style={{ flex:1, padding:13 }}>
-                      Done — Go to Dashboard →
+                  {imageFile && (
+                    <div style={{ fontSize:12, color:"var(--text-muted)", marginBottom:4 }}>
+                      ✓ {imageFile.name}
+                    </div>
+                  )}
+                  <p style={{ fontSize:12, color:"var(--text-faint)", lineHeight:1.5, margin:0 }}>
+                    JPG, PNG or WebP · Max 2 MB
+                  </p>
+                  {imagePreview && (
+                    <button
+                      type="button"
+                      onClick={() => { setImageFile(null); setImagePreview(""); }}
+                      style={{ background:"none", border:"none", color:"var(--red)", fontSize:12, cursor:"pointer", padding:0, marginTop:4 }}
+                    >
+                      Remove photo
                     </button>
                   )}
                 </div>
-              </form>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display:"none" }}
+                onChange={handleImageChange}
+              />
             </div>
-          </div>
-        )}
+
+            {/* ── Bio ── */}
+            <div className="form-group">
+              <label className="form-label"><AlignLeft size={13}/> Bio / About you</label>
+              <textarea
+                className="form-input" rows={4}
+                placeholder="Tell customers about your skills and experience…"
+                value={bio} onChange={e => setBio(e.target.value)}
+                required style={{ resize:"vertical" }}
+              />
+            </div>
+
+            {/* ── Location: Country + City + Specific Address ── */}
+            <div className="form-group">
+              <label className="form-label"><MapPin size={13}/> Location</label>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+                {/* Country */}
+                <div style={{ position:"relative" }}>
+                  <Globe size={15} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:"var(--text-faint)", pointerEvents:"none", zIndex:1 }} />
+                  <select
+                    className="form-input"
+                    style={{ paddingLeft:36, appearance:"none", cursor:"pointer" }}
+                    value={country}
+                    onChange={e => {
+                      setCountry(e.target.value);
+                      setCity(""); // reset city when country changes
+                    }}
+                    required
+                  >
+                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                {/* City — dropdown for Ethiopia, free text otherwise */}
+                {country === "Ethiopia" ? (
+                  <div style={{ position:"relative" }}>
+                    <MapPin size={15} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:"var(--text-faint)", pointerEvents:"none", zIndex:1 }} />
+                    <select
+                      className="form-input"
+                      style={{ paddingLeft:36, appearance:"none", cursor:"pointer" }}
+                      value={city}
+                      onChange={e => setCity(e.target.value)}
+                      required
+                    >
+                      <option value="">Select city…</option>
+                      {ETHIOPIAN_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                ) : (
+                  <div style={{ position:"relative" }}>
+                    <MapPin size={15} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:"var(--text-faint)", pointerEvents:"none", zIndex:1 }} />
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ paddingLeft:36 }}
+                      placeholder="City / Town"
+                      value={city}
+                      onChange={e => setCity(e.target.value)}
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+              {/* Specific address */}
+              <div style={{ position:"relative" }}>
+                <Home size={15} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:"var(--text-faint)", pointerEvents:"none" }} />
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ paddingLeft:36 }}
+                  placeholder="Specific address (e.g. Bole Road, near Edna Mall)"
+                  value={specificAddress}
+                  onChange={e => setSpecificAddress(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* ── Phone ── */}
+            <div className="form-group">
+              <label className="form-label"><Phone size={13}/> Phone number</label>
+              <div style={{ position:"relative" }}>
+                <Phone size={15} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:"var(--text-faint)", pointerEvents:"none" }} />
+                <input
+                  type="tel"
+                  className="form-input"
+                  style={{ paddingLeft:36 }}
+                  placeholder="+251 91 234 5678"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ width:"100%", padding:14, fontSize:15, marginTop:8 }}
+              disabled={loading}
+            >
+              {loading
+                ? <span style={{ display:"flex", gap:8, alignItems:"center" }}><span style={{ width:16, height:16, borderRadius:"50%", border:"2px solid rgba(255,255,255,.3)", borderTopColor:"#fff", animation:"spin-slow .7s linear infinite", display:"inline-block" }} /> Saving…</span>
+                : "Save Profile & Finish"
+              }
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

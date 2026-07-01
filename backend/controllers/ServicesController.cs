@@ -35,6 +35,22 @@ public class ServicesController : ControllerBase
         return Ok(services);
     }
 
+    // GET my services
+    [Authorize]
+    [HttpGet("my")]
+    public async Task<IActionResult> GetMy()
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var provider = await _context.ServiceProviders.FirstOrDefaultAsync(p => p.UserId == userId);
+        if (provider == null) return Ok(new List<Service>());
+
+        var services = await _context.Services
+            .Where(s => s.ProviderId == provider.Id)
+            .ToListAsync();
+            
+        return Ok(services);
+    }
+
     // GET single service
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id)
