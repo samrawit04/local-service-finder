@@ -20,7 +20,7 @@ export default function Register() {
     setLoading(true);
     try {
       await register(name, email, password, role);
-      navigate(role === "Provider" ? "/provider/setup" : "/providers");
+      navigate("/dashboard");
     } catch (err: any) {
       setError(err.response?.data || "Registration failed. Try a different email.");
     } finally {

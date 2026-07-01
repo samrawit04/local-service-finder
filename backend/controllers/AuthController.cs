@@ -37,6 +37,20 @@ public class AuthController : ControllerBase
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
+        if (user.Role == "Provider")
+        {
+            var provider = new backend.Models.ServiceProvider
+            {
+                UserId = user.Id,
+                Bio = "",
+                Location = "",
+                Phone = "",
+                ProfileImage = ""
+            };
+            _context.ServiceProviders.Add(provider);
+            await _context.SaveChangesAsync();
+        }
+
         var token = _tokenService.CreateToken(user);
         return Ok(new { token, user.Id, user.Name, user.Email, user.Role });
     }

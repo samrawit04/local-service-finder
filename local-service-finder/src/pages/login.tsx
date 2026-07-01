@@ -18,7 +18,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/providers");
+      navigate("/dashboard");
     } catch (err: any) {
       setError(err.response?.data || "Invalid credentials. Please try again.");
     } finally {

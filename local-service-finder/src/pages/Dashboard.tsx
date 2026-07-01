@@ -2,34 +2,39 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 import type { Booking } from "../types";
 import { useAuth } from "../context/AuthContext";
-import { CalendarClock, Check, X, Star, MessageSquare, Clock, TrendingUp, ArrowRight } from "lucide-react";
+import { CalendarClock, Check, X, Star, MessageSquare, Clock, TrendingUp, ArrowRight, Briefcase } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function Dashboard() {
   const { user }                          = useAuth();
   const [customerBookings, setCustomer]   = useState<Booking[]>([]);
   const [providerBookings, setProvider]   = useState<Booking[]>([]);
+  const [myApplications, setMyApplications] = useState<any[]>([]);
   const [loading, setLoading]             = useState(true);
-  const [tab, setTab]                     = useState<"requests" | "incoming">("requests");
+  const [tab, setTab]                     = useState<"requests" | "incoming" | "applications">("incoming");
   const [reviewingId, setReviewingId]     = useState<string|null>(null);
   const [rating, setRating]               = useState(5);
   const [comment, setComment]             = useState("");
   const [hoverStar, setHoverStar]         = useState(0);
 
-  useEffect(() => { fetchBookings(); }, []);
+  useEffect(() => { fetchDashboardData(); }, [user]);
 
-  const fetchBookings = async () => {
+  const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/Bookings/my");
-      setCustomer(res.data.asCustomer || []);
-      setProvider(res.data.asProvider || []);
+      const [bookRes, appRes] = await Promise.all([
+        api.get("/Bookings/my"),
+        user?.role === "Provider" ? api.get("/JobPosts/my-applications") : Promise.resolve({ data: [] })
+      ]);
+      setCustomer(bookRes.data.asCustomer || []);
+      setProvider(bookRes.data.asProvider || []);
+      setMyApplications(appRes.data || []);
     } catch { /* silent */ }
     finally   { setLoading(false); }
   };
 
   const handleStatus = async (id: string, status: string) => {
-    try { await api.put(`/Bookings/${id}/status`, { status }); fetchBookings(); }
+    try { await api.put(`/Bookings/${id}/status`, { status }); fetchDashboardData(); }
     catch { alert("Failed to update booking."); }
   };
 
@@ -55,7 +60,7 @@ export default function Dashboard() {
   const stats = [
     { icon:<CalendarClock size={20}/>, label:"Total Bookings", value: customerBookings.length + providerBookings.length },
     { icon:<TrendingUp     size={20}/>, label:"Active",        value: [...customerBookings,...providerBookings].filter(b => b.status==="Accepted").length },
-    { icon:<Clock          size={20}/>, label:"Pending",       value: [...customerBookings,...providerBookings].filter(b => b.status==="Pending").length },
+    { icon:<Briefcase      size={20}/>, label:"Job Applications",  value: myApplications.length },
   ];
 
   if (loading) return (
@@ -81,7 +86,7 @@ export default function Dashboard() {
             <p style={{ marginTop:8 }}>Manage your bookings and track your service history.</p>
           </div>
           {user?.role === "Provider" && (
-            <Link to="/provider/setup" className="btn btn-ghost" style={{ gap:8 }}>
+            <Link to="/profile" className="btn btn-ghost" style={{ gap:8 }}>
               My Services <ArrowRight size={15}/>
             </Link>
           )}
@@ -112,6 +117,9 @@ export default function Dashboard() {
               </button>
               <button className={`tab${tab==="requests" ? " active" : ""}`} onClick={() => setTab("requests")}>
                 My Bookings
+              </button>
+              <button className={`tab${tab==="applications" ? " active" : ""}`} onClick={() => setTab("applications")}>
+                Job Applications
               </button>
             </div>
           </div>
@@ -214,7 +222,7 @@ export default function Dashboard() {
               <div className="card card-pad" style={{ textAlign:"center", padding:"48px 24px", color:"var(--text-muted)" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>📬</div>
                 <p>No bookings yet. Make sure your services are listed.</p>
-                <Link to="/provider/setup" className="btn btn-primary" style={{ marginTop:20, display:"inline-flex" }}>
+                <Link to="/profile" className="btn btn-primary" style={{ marginTop:20, display:"inline-flex" }}>
                   Add Services
                 </Link>
               </div>
@@ -252,6 +260,60 @@ export default function Dashboard() {
             )}
           </section>
         )}
+
+        {/* ── Provider: My Applications ── */}
+        {user?.role === "Provider" && tab === "applications" && (
+          <section>
+            <h2 className="section-heading">
+              <span className="section-icon"><Briefcase size={20}/></span> My Job Applications
+            </h2>
+            {myApplications.length === 0 ? (
+              <div className="card card-pad" style={{ textAlign:"center", padding:"48px 24px", color:"var(--text-muted)" }}>
+                <div style={{ fontSize:40, marginBottom:12 }}>💼</div>
+                <p>You haven't applied to any jobs yet.</p>
+                <Link to="/jobs" className="btn btn-primary" style={{ marginTop:20, display:"inline-flex" }}>
+                  Browse Jobs
+                </Link>
+              </div>
+            ) : (
+              <div style={{ display:"grid", gap:14 }}>
+                {myApplications.map((app, i) => (
+                  <div key={app.id} className={`card card-pad anim-fade anim-delay${Math.min(i+1,4)}`}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:12 }}>
+                      <div>
+                        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                          <h3 style={{ fontSize:17, margin:0 }}>
+                            <Link to={`/jobs/${app.job.id}`} style={{ color:"#fff", textDecoration:"none" }}>
+                              {app.job.title}
+                            </Link>
+                          </h3>
+                          <span className={statusStyle(app.status)[0]}>{statusStyle(app.status)[1]}</span>
+                        </div>
+                        <p style={{ fontSize:14, margin:"0 0 4px" }}>
+                          Customer: <span style={{ color:"#fff", fontWeight:500 }}>{app.job.customerName}</span>
+                        </p>
+                        <p style={{ fontSize:13, margin:0, color:"var(--text-faint)" }}>
+                          Applied: {new Date(app.appliedAt).toLocaleDateString("en-US",{ weekday:"short", month:"short", day:"numeric", year:"numeric" })}
+                        </p>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <span className="badge badge-accent" style={{ fontSize: 11, background: "rgba(108,99,255,.15)" }}>
+                          {app.job.category}
+                        </span>
+                        {app.job.budget && (
+                          <div style={{ color: "#22d3ee", fontWeight: 700, fontSize: 14, marginTop: 8 }}>
+                            ${app.job.budget}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
       </div>
     </div>
   );

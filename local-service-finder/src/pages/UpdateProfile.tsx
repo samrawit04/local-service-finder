@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import {
-  User, Mail, Lock, Eye, EyeOff, Upload, Save, CheckCircle,
-  AlertCircle, Briefcase, PlusCircle, Tag, AlignLeft, Trash2
+  Upload, Save, CheckCircle, AlertCircle,
+  Briefcase, PlusCircle, Tag, AlignLeft, Trash2,
+  MapPin, Phone
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -23,27 +24,26 @@ export default function UpdateProfile() {
   const { user }    = useAuth();
   const navigate    = useNavigate();
 
-  const [name, setName]                   = useState(user?.name || "");
-  const [email, setEmail]                 = useState(user?.email || "");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword]     = useState("");
-  const [showCurrent, setShowCurrent]     = useState(false);
-  const [showNew, setShowNew]             = useState(false);
-  const [imageFile, setImageFile]         = useState<File | null>(null);
-  const [imagePreview, setImagePreview]   = useState<string>("");
-  
-  // Profile loading states
-  const [loading, setLoading]             = useState(false);
-  const [success, setSuccess]             = useState("");
-  const [error, setError]                 = useState("");
-  const fileInputRef                      = useRef<HTMLInputElement>(null);
+  const [imageFile, setImageFile]   = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+
+  // Provider fields
+  const [providerId, setProviderId] = useState("");
+  const [bio, setBio]               = useState("");
+  const [location, setLocation]     = useState("");
+  const [phone, setPhone]           = useState("");
+
+  const [loading, setLoading]       = useState(false);
+  const [success, setSuccess]       = useState("");
+  const [error, setError]           = useState("");
+  const fileInputRef                = useRef<HTMLInputElement>(null);
 
   // Services states
-  const [services, setServices]           = useState<ServiceItem[]>([]);
+  const [services, setServices]         = useState<ServiceItem[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
-  const [sTitle, setSTitle]               = useState("");
-  const [sCat, setSCat]                   = useState("");
-  const [sDesc, setSDesc]                 = useState("");
+  const [sTitle, setSTitle]             = useState("");
+  const [sCat, setSCat]                 = useState("");
+  const [sDesc, setSDesc]               = useState("");
   const [addingService, setAddingService] = useState(false);
 
   useEffect(() => {
@@ -52,30 +52,38 @@ export default function UpdateProfile() {
 
   useEffect(() => {
     if (user?.role === "Provider") {
+      fetchProviderInfo();
       fetchMyServices();
     } else {
       setServicesLoading(false);
     }
   }, [user]);
 
+  const fetchProviderInfo = async () => {
+    try {
+      const res = await api.get("/Providers/me");
+      if (res.data) {
+        setProviderId(res.data.id);
+        setBio(res.data.bio || "");
+        setLocation(res.data.location || "");
+        setPhone(res.data.phone || "");
+        if (res.data.profileImage) setImagePreview(res.data.profileImage);
+      }
+    } catch { /* ignore */ }
+  };
+
   const fetchMyServices = async () => {
     try {
       const res = await api.get("/Services/my");
       setServices(res.data);
-    } catch {
-      // ignore
-    } finally {
-      setServicesLoading(false);
-    }
+    } catch { /* ignore */ }
+    finally { setServicesLoading(false); }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setError("Image must be under 2 MB.");
-      return;
-    }
+    if (file.size > 2 * 1024 * 1024) { setError("Image must be under 2 MB."); return; }
     setImageFile(file);
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result as string);
@@ -84,25 +92,18 @@ export default function UpdateProfile() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
-    setLoading(true);
+    setError(""); setSuccess(""); setLoading(true);
     try {
-      const payload: any = { name, email };
-      if (imagePreview) payload.profileImageBase64 = imagePreview;
-      if (newPassword && currentPassword) {
-        payload.currentPassword = currentPassword;
-        payload.newPassword = newPassword;
+      if (user?.role === "Provider" && providerId) {
+        await api.put(`/Providers/${providerId}`, {
+          bio, location, phone,
+          profileImage: imagePreview || ""
+        });
       }
-      await api.put("/Auth/profile", payload);
       setSuccess("Profile updated successfully!");
-      setCurrentPassword("");
-      setNewPassword("");
     } catch (err: any) {
       setError(err.response?.data || "Update failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleAddService = async (e: React.FormEvent) => {
@@ -114,19 +115,15 @@ export default function UpdateProfile() {
       setSTitle(""); setSCat(""); setSDesc("");
     } catch (err: any) {
       alert(err.response?.data || "Failed to add service.");
-    } finally {
-      setAddingService(false);
-    }
+    } finally { setAddingService(false); }
   };
 
   const handleDeleteService = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this service?")) return;
+    if (!window.confirm("Delete this service?")) return;
     try {
       await api.delete(`/Services/${id}`);
       setServices(prev => prev.filter(s => s.id !== id));
-    } catch (err: any) {
-      alert("Failed to delete service.");
-    }
+    } catch { alert("Failed to delete service."); }
   };
 
   const avatarBg = imagePreview
@@ -134,11 +131,7 @@ export default function UpdateProfile() {
     : `linear-gradient(135deg, ${user?.role === "Provider" ? "#22d3ee, #6C63FF" : "#6C63FF, #A259FF"})`;
 
   const initials = (user?.name || "U")
-    .split(" ")
-    .map(w => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+    .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
   return (
     <div className="page-wrap">
@@ -150,7 +143,9 @@ export default function UpdateProfile() {
             Account Settings
           </p>
           <h1 style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-1px", marginBottom: 8 }}>Update Profile</h1>
-          <p style={{ color: "var(--text-muted)" }}>Change your name, email, photo, or password.</p>
+          <p style={{ color: "var(--text-muted)" }}>
+            {user?.role === "Provider" ? "Update your photo, bio, location and services." : "Update your profile photo."}
+          </p>
         </div>
 
         {/* Alerts */}
@@ -165,6 +160,7 @@ export default function UpdateProfile() {
           </div>
         )}
 
+        {/* ── Main Profile Card ── */}
         <div className="card card-pad anim-fade" style={{ animationDelay: ".05s", marginBottom: 32 }}>
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg,var(--accent),var(--accent-2))", borderRadius: "14px 14px 0 0" }} />
 
@@ -192,124 +188,56 @@ export default function UpdateProfile() {
               <div>
                 <p style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>{user?.name}</p>
                 <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 10 }}>{user?.email}</p>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="btn btn-ghost"
-                  style={{ padding: "7px 16px", fontSize: 13 }}
-                >
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="btn btn-ghost" style={{ padding: "7px 16px", fontSize: 13 }}>
                   <Upload size={14} /> {imageFile ? "Change photo" : "Upload photo"}
                 </button>
                 {imageFile && (
                   <>
                     <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 10 }}>✓ {imageFile.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => { setImageFile(null); setImagePreview(""); }}
-                      style={{ background: "none", border: "none", color: "var(--red)", fontSize: 12, cursor: "pointer", marginLeft: 10 }}
-                    >Remove</button>
+                    <button type="button" onClick={() => { setImageFile(null); setImagePreview(""); }} style={{ background: "none", border: "none", color: "var(--red)", fontSize: 12, cursor: "pointer", marginLeft: 10 }}>Remove</button>
                   </>
                 )}
                 <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6, margin: 0 }}>JPG, PNG or WebP · Max 2 MB</p>
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                style={{ display: "none" }}
-                onChange={handleImageChange}
-              />
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={handleImageChange} />
             </div>
 
-            <hr style={{ border: "none", borderTop: "1px solid var(--border)" }} />
+            {/* ── Provider Specific Fields ── */}
+            {user?.role === "Provider" && (
+              <>
+                <hr style={{ border: "none", borderTop: "1px solid var(--border)" }} />
+                <p style={{ color: "#fff", fontWeight: 700, fontSize: 14, marginBottom: 0 }}>Provider Details</p>
 
-            {/* ── Name ── */}
-            <div>
-              <label className="form-label"><User size={13} /> Full name</label>
-              <div className="form-input-icon-wrap">
-                <User size={17} className="input-icon" />
-                <input
-                  type="text"
-                  className="form-input"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Your full name"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* ── Email ── */}
-            <div>
-              <label className="form-label"><Mail size={13} /> Email address</label>
-              <div className="form-input-icon-wrap">
-                <Mail size={17} className="input-icon" />
-                <input
-                  type="email"
-                  className="form-input"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  required
-                />
-              </div>
-            </div>
-
-            <hr style={{ border: "none", borderTop: "1px solid var(--border)" }} />
-
-            {/* ── Change Password (optional) ── */}
-            <div>
-              <p style={{ color: "#fff", fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Change Password <span style={{ color: "var(--text-faint)", fontWeight: 400 }}>(optional)</span></p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div>
-                  <label className="form-label"><Lock size={13} /> Current password</label>
-                  <div className="form-input-icon-wrap">
-                    <Lock size={17} className="input-icon" />
-                    <input
-                      type={showCurrent ? "text" : "password"}
-                      className="form-input"
-                      style={{ paddingRight: 44 }}
-                      placeholder="Enter current password"
-                      value={currentPassword}
-                      onChange={e => setCurrentPassword(e.target.value)}
-                    />
-                    <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="login-eye-btn">
-                      {showCurrent ? <EyeOff size={17} /> : <Eye size={17} />}
-                    </button>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div>
+                    <label className="form-label"><MapPin size={13} /> Location / City</label>
+                    <div className="form-input-icon-wrap">
+                      <MapPin size={17} className="input-icon" />
+                      <input type="text" className="form-input" value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Addis Ababa" required />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="form-label"><Phone size={13} /> Phone number</label>
+                    <div className="form-input-icon-wrap">
+                      <Phone size={17} className="input-icon" />
+                      <input type="tel" className="form-input" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+251 911 234 567" required />
+                    </div>
                   </div>
                 </div>
+
                 <div>
-                  <label className="form-label"><Lock size={13} /> New password</label>
+                  <label className="form-label"><AlignLeft size={13} /> Bio / About you</label>
                   <div className="form-input-icon-wrap">
-                    <Lock size={17} className="input-icon" />
-                    <input
-                      type={showNew ? "text" : "password"}
-                      className="form-input"
-                      style={{ paddingRight: 44 }}
-                      placeholder="Min. 8 characters"
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      minLength={newPassword ? 8 : undefined}
-                    />
-                    <button type="button" onClick={() => setShowNew(!showNew)} className="login-eye-btn">
-                      {showNew ? <EyeOff size={17} /> : <Eye size={17} />}
-                    </button>
+                    <AlignLeft size={17} className="input-icon" style={{ top: 16, transform: "none" }} />
+                    <textarea className="form-input" rows={3} style={{ paddingLeft: 44, resize: "vertical" }} value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell customers about your skills and experience..." required />
                   </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
 
             {/* ── Submit ── */}
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ width: "100%", padding: 14, fontSize: 15 }}
-              disabled={loading}
-            >
-              {loading
-                ? <><span className="login-spinner" /> Saving changes…</>
-                : <><Save size={17} /> Save Changes</>
-              }
+            <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15 }} disabled={loading}>
+              {loading ? <><span className="login-spinner" /> Saving changes…</> : <><Save size={17} /> Save Changes</>}
             </button>
 
           </form>
@@ -337,13 +265,7 @@ export default function UpdateProfile() {
                           </div>
                           <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{s.description}</p>
                         </div>
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          style={{ padding: 8, color: "var(--red)" }}
-                          onClick={() => handleDeleteService(s.id)}
-                          title="Delete service"
-                        >
+                        <button type="button" className="btn btn-ghost" style={{ padding: 8, color: "var(--red)" }} onClick={() => handleDeleteService(s.id)} title="Delete service">
                           <Trash2 size={16} />
                         </button>
                       </div>

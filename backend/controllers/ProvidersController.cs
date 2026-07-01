@@ -59,6 +59,20 @@ public class ProvidersController : ControllerBase
         return Ok(provider);
     }
 
+    // GET own provider profile
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<IActionResult> GetMe()
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var provider = await _context.ServiceProviders
+            .Include(p => p.Services)
+            .FirstOrDefaultAsync(p => p.UserId == userId);
+
+        if (provider == null) return NotFound();
+        return Ok(provider);
+    }
+
     // POST create provider profile (requires login)
     [Authorize]
     [HttpPost]

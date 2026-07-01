@@ -5,7 +5,6 @@ import Navbar from "./components/Navbar";
 import Providers from "./pages/Providers";
 import ProviderDetail from "./pages/ProviderDetail";
 import Dashboard from "./pages/Dashboard";
-import ProviderSetup from "./pages/ProviderSetup";
 import UpdateProfile from "./pages/UpdateProfile";
 import JobBoard from "./pages/JobBoard";
 import JobDetail from "./pages/JobDetail";
@@ -20,7 +19,6 @@ function App() {
         <Route path="/providers"        element={<Providers />} />
         <Route path="/providers/:id"    element={<ProviderDetail />} />
         <Route path="/dashboard"        element={<Dashboard />} />
-        <Route path="/provider/setup"   element={<ProviderSetup />} />
         <Route path="/profile"          element={<UpdateProfile />} />
         <Route path="/jobs"             element={<JobBoard />} />
         <Route path="/jobs/:id"         element={<JobDetail />} />
