@@ -211,58 +211,62 @@ export default function JobBoard() {
             <p style={{ color:"var(--text-muted)", fontSize:16 }}>No jobs found. {isCustomer && "Be the first to post one!"}</p>
           </div>
         ) : (
-          <div className="job-grid">
+          <div className="job-list">
             {jobs.map((job, i) => (
-              <Link
-                to={`/jobs/${job.id}`}
-                key={job.id}
-                className="job-card anim-fade"
-                style={{ animationDelay:`${i * 0.04}s`, textDecoration:"none" }}
-              >
-                {/* Status dot */}
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
-                  <span className="badge badge-accent" style={{ fontSize:11 }}>{job.category}</span>
-                  <span style={{
-                    fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20,
-                    background: job.status === "Open" ? "rgba(16,185,129,.12)" : "rgba(255,255,255,.04)",
-                    color: job.status === "Open" ? "var(--green)" : "var(--text-faint)",
-                    border: `1px solid ${job.status === "Open" ? "rgba(16,185,129,.3)" : "var(--border)"}`
-                  }}>
-                    {job.status}
-                  </span>
-                </div>
-
-                <h3 style={{ fontSize:17, fontWeight:700, color:"#fff", marginBottom:8, lineHeight:1.3 }}>{job.title}</h3>
-                <p style={{ color:"var(--text-muted)", fontSize:13, lineHeight:1.6, marginBottom:16,
-                  display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
-                  {job.description}
-                </p>
-
-                {/* Meta */}
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:16 }}>
-                  {job.budget && (
-                    <span style={{ display:"flex", alignItems:"center", gap:5, color:"var(--accent)", fontSize:12, fontWeight:700 }}>
-                      <DollarSign size={12} /> {job.budget}
+              <div key={job.id}>
+                <Link
+                  to={`/jobs/${job.id}`}
+                  className="job-card anim-fade"
+                  style={{ animationDelay:`${i * 0.04}s`, textDecoration:"none", display: "block", padding: "16px 0" }}
+                >
+                  {/* Status dot */}
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
+                    <span className="badge badge-accent" style={{ fontSize:11 }}>{job.category}</span>
+                    <span style={{
+                      fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20,
+                      background: job.status === "Open" ? "rgba(16,185,129,.12)" : "rgba(255,255,255,.04)",
+                      color: job.status === "Open" ? "var(--green)" : "var(--text-faint)",
+                      border: `1px solid ${job.status === "Open" ? "rgba(16,185,129,.3)" : "var(--border)"}`
+                    }}>
+                      {job.status}
                     </span>
-                  )}
-                  <span style={{ display:"flex", alignItems:"center", gap:5, color:"var(--text-faint)", fontSize:12 }}>
-                    <MapPin size={12} /> {job.location || "Remote/Flexible"}
-                  </span>
-                  <span style={{ display:"flex", alignItems:"center", gap:5, color:"var(--text-faint)", fontSize:12 }}>
-                    <Users size={12} /> {job.applicationCount} applied
-                  </span>
-                  <span style={{ display:"flex", alignItems:"center", gap:5, color:"var(--text-faint)", fontSize:12 }}>
-                    <Clock size={12} /> {timeAgo(job.createdAt)}
-                  </span>
-                </div>
+                  </div>
 
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <span style={{ color:"var(--text-faint)", fontSize:12 }}>by {job.customerName}</span>
-                  <span style={{ display:"flex", alignItems:"center", gap:4, color:"var(--accent)", fontSize:13, fontWeight:600 }}>
-                    View details <ChevronRight size={14} />
-                  </span>
-                </div>
-              </Link>
+                  <h3 style={{ fontSize:17, fontWeight:700, color:"#fff", marginBottom:8, lineHeight:1.3 }}>{job.title}</h3>
+                  <p style={{ color:"var(--text-muted)", fontSize:13, lineHeight:1.6, marginBottom:16,
+                    display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                    {job.description}
+                  </p>
+
+                  {/* Meta */}
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:16 }}>
+                    {job.budget && (
+                      <span style={{ display:"flex", alignItems:"center", gap:5, color:"var(--accent)", fontSize:12, fontWeight:700 }}>
+                        <DollarSign size={12} /> {job.budget}
+                      </span>
+                    )}
+                    <span style={{ display:"flex", alignItems:"center", gap:5, color:"var(--text-faint)", fontSize:12 }}>
+                      <MapPin size={12} /> {job.location || "Remote/Flexible"}
+                    </span>
+                    <span style={{ display:"flex", alignItems:"center", gap:5, color:"var(--text-faint)", fontSize:12 }}>
+                      <Users size={12} /> {job.applicationCount} applied
+                    </span>
+                    <span style={{ display:"flex", alignItems:"center", gap:5, color:"var(--text-faint)", fontSize:12 }}>
+                      <Clock size={12} /> {timeAgo(job.createdAt)}
+                    </span>
+                  </div>
+
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <span style={{ color:"var(--text-faint)", fontSize:12 }}>by {job.customerName}</span>
+                    <span style={{ display:"flex", alignItems:"center", gap:4, color:"var(--accent)", fontSize:13, fontWeight:600 }}>
+                      View details <ChevronRight size={14} />
+                    </span>
+                  </div>
+                </Link>
+                {i < jobs.length - 1 && (
+                  <hr style={{ border: 0, borderBottom: "1px solid rgba(255, 255, 255, 0.08)", margin: "8px 0" }} />
+                )}
+              </div>
             ))}
           </div>
         )}

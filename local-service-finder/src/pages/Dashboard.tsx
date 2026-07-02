@@ -10,8 +10,9 @@ export default function Dashboard() {
   const [customerBookings, setCustomer]   = useState<Booking[]>([]);
   const [providerBookings, setProvider]   = useState<Booking[]>([]);
   const [myApplications, setMyApplications] = useState<any[]>([]);
+  const [myJobPosts, setMyJobPosts]       = useState<any[]>([]);
   const [loading, setLoading]             = useState(true);
-  const [tab, setTab]                     = useState<"requests" | "incoming" | "applications">("incoming");
+  const [tab, setTab]                     = useState<string>("");
   const [reviewingId, setReviewingId]     = useState<string|null>(null);
   const [rating, setRating]               = useState(5);
   const [comment, setComment]             = useState("");
@@ -19,16 +20,24 @@ export default function Dashboard() {
 
   useEffect(() => { fetchDashboardData(); }, [user]);
 
+  useEffect(() => {
+    if (user && !tab) {
+      setTab(user.role === "Customer" ? "requests" : "incoming");
+    }
+  }, [user, tab]);
+
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [bookRes, appRes] = await Promise.all([
+      const [bookRes, appRes, postRes] = await Promise.all([
         api.get("/Bookings/my"),
-        user?.role === "Provider" ? api.get("/JobPosts/my-applications") : Promise.resolve({ data: [] })
+        user?.role === "Provider" ? api.get("/JobPosts/my-applications") : Promise.resolve({ data: [] }),
+        user?.role === "Customer" ? api.get("/JobPosts/my-posts") : Promise.resolve({ data: [] })
       ]);
       setCustomer(bookRes.data.asCustomer || []);
       setProvider(bookRes.data.asProvider || []);
       setMyApplications(appRes.data || []);
+      setMyJobPosts(postRes.data || []);
     } catch { /* silent */ }
     finally   { setLoading(false); }
   };
@@ -57,10 +66,14 @@ export default function Dashboard() {
     return                       ["badge badge-gold",    s];
   };
 
-  const stats = [
-    { icon:<CalendarClock size={20}/>, label:"Total Bookings", value: customerBookings.length + providerBookings.length },
-    { icon:<TrendingUp     size={20}/>, label:"Active",        value: [...customerBookings,...providerBookings].filter(b => b.status==="Accepted").length },
+  const stats = user?.role === "Provider" ? [
+    { icon:<CalendarClock size={20}/>, label:"Total Bookings", value: providerBookings.length },
+    { icon:<TrendingUp     size={20}/>, label:"Active Bookings", value: providerBookings.filter(b => b.status==="Accepted").length },
     { icon:<Briefcase      size={20}/>, label:"Job Applications",  value: myApplications.length },
+  ] : [
+    { icon:<CalendarClock size={20}/>, label:"Total Bookings", value: customerBookings.length },
+    { icon:<Briefcase      size={20}/>, label:"Job Posts",     value: myJobPosts.length },
+    { icon:<Check          size={20}/>, label:"Accepted Bookings", value: customerBookings.filter(b => b.status==="Accepted").length },
   ];
 
   if (loading) return (
@@ -109,24 +122,35 @@ export default function Dashboard() {
         </div>
 
         {/* ── Tabs ── */}
-        {user?.role !== "Provider" ? null : (
-          <div style={{ marginBottom:28 }}>
-            <div className="tabs">
-              <button className={`tab${tab==="incoming" ? " active" : ""}`} onClick={() => setTab("incoming")}>
-                Incoming Requests
-              </button>
-              <button className={`tab${tab==="requests" ? " active" : ""}`} onClick={() => setTab("requests")}>
-                My Bookings
-              </button>
-              <button className={`tab${tab==="applications" ? " active" : ""}`} onClick={() => setTab("applications")}>
-                Job Applications
-              </button>
-            </div>
+        <div style={{ marginBottom:28 }}>
+          <div className="tabs">
+            {user?.role === "Provider" ? (
+              <>
+                <button className={`tab${tab==="incoming" ? " active" : ""}`} onClick={() => setTab("incoming")}>
+                  Incoming Requests
+                </button>
+                <button className={`tab${tab==="requests" ? " active" : ""}`} onClick={() => setTab("requests")}>
+                  My Bookings
+                </button>
+                <button className={`tab${tab==="applications" ? " active" : ""}`} onClick={() => setTab("applications")}>
+                  Job Applications
+                </button>
+              </>
+            ) : (
+              <>
+                <button className={`tab${tab==="requests" ? " active" : ""}`} onClick={() => setTab("requests")}>
+                  My Bookings
+                </button>
+                <button className={`tab${tab==="posts" ? " active" : ""}`} onClick={() => setTab("posts")}>
+                  My Job Posts
+                </button>
+              </>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* ── Customer: My Requests ── */}
-        {(user?.role === "Customer" || tab === "requests") && (
+        {/* ── My Requests ── */}
+        {tab === "requests" && (
           <section style={{ marginBottom:48 }}>
             <h2 className="section-heading">
               <span className="section-icon"><CalendarClock size={20}/></span>
@@ -205,6 +229,57 @@ export default function Dashboard() {
                         </form>
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ── Customer: My Job Posts ── */}
+        {user?.role === "Customer" && tab === "posts" && (
+          <section style={{ marginBottom:48 }}>
+            <h2 className="section-heading">
+              <span className="section-icon"><Briefcase size={20}/></span> My Job Posts
+            </h2>
+            {myJobPosts.length === 0 ? (
+              <div className="card card-pad" style={{ textAlign:"center", padding:"48px 24px", color:"var(--text-muted)" }}>
+                <div style={{ fontSize:40, marginBottom:12 }}>📝</div>
+                <p>You haven't posted any jobs yet.</p>
+                <Link to="/jobs" className="btn btn-primary" style={{ marginTop:20, display:"inline-flex" }}>
+                  Post a Job
+                </Link>
+              </div>
+            ) : (
+              <div style={{ display:"grid", gap:14 }}>
+                {myJobPosts.map((post: any, i: number) => (
+                  <div key={post.id} className={`card card-pad anim-fade anim-delay${Math.min(i+1,4)}`}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:12 }}>
+                      <div>
+                        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                          <h3 style={{ fontSize:17, margin:0 }}>
+                            <Link to={`/jobs/${post.id}`} style={{ color:"#fff", textDecoration:"none" }}>
+                              {post.title}
+                            </Link>
+                          </h3>
+                          <span className={statusStyle(post.status)[0]}>{statusStyle(post.status)[1]}</span>
+                        </div>
+                        <p style={{ fontSize:14, margin:"0 0 4px", color:"var(--text-muted)" }}>
+                          Category: <span style={{ color:"#fff" }}>{post.category}</span>
+                        </p>
+                        <p style={{ fontSize:13, margin:0, color:"var(--text-faint)" }}>
+                          Posted: {new Date(post.createdAt).toLocaleDateString("en-US",{ weekday:"short", month:"short", day:"numeric", year:"numeric" })}
+                        </p>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ color: "var(--accent)", fontWeight: 700, fontSize: 14 }}>
+                          {post.applicationCount} Applicants
+                        </div>
+                        <Link to={`/jobs/${post.id}`} className="btn btn-ghost" style={{ marginTop: 8, padding: "6px 12px", fontSize: 12 }}>
+                          View Details
+                        </Link>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
