@@ -26,26 +26,54 @@ public class ReviewsController : ControllerBase
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == dto.BookingId);
-        if (booking == null) return NotFound("Booking not found.");
-        if (booking.CustomerId != userId) return Forbid();
-        if (booking.Status != "Accepted") return BadRequest("You can only review completed bookings.");
-
-        var alreadyReviewed = await _context.Reviews.AnyAsync(r => r.BookingId == dto.BookingId);
-        if (alreadyReviewed) return BadRequest("You already reviewed this booking.");
-
-        var review = new Review
+        if (dto.BookingId.HasValue)
         {
-            CustomerId = userId,
-            ProviderId = booking.ProviderId,
-            BookingId = booking.Id,
-            Rating = dto.Rating,
-            Comment = dto.Comment
-        };
+            var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == dto.BookingId.Value);
+            if (booking == null) return NotFound("Booking not found.");
+            if (booking.CustomerId != userId) return Forbid();
+            if (booking.Status != "Completed") return BadRequest("You can only review completed bookings.");
 
-        _context.Reviews.Add(review);
-        await _context.SaveChangesAsync();
-        return Ok(review);
+            var alreadyReviewed = await _context.Reviews.AnyAsync(r => r.BookingId == dto.BookingId.Value);
+            if (alreadyReviewed) return BadRequest("You already reviewed this booking.");
+
+            var review = new Review
+            {
+                CustomerId = userId,
+                ProviderId = booking.ProviderId,
+                BookingId = booking.Id,
+                Rating = dto.Rating,
+                Comment = dto.Comment
+            };
+            _context.Reviews.Add(review);
+            await _context.SaveChangesAsync();
+            return Ok(review);
+        }
+        else if (dto.JobPostId.HasValue)
+        {
+            var jobPost = await _context.JobPosts.Include(j => j.Applications).FirstOrDefaultAsync(j => j.Id == dto.JobPostId.Value);
+            if (jobPost == null) return NotFound("Job Post not found.");
+            if (jobPost.CustomerId != userId) return Forbid();
+
+            var completedApp = jobPost.Applications.FirstOrDefault(a => a.Status == "Completed");
+            if (completedApp == null) return BadRequest("This job has no completed application to review.");
+
+            var alreadyReviewed = await _context.Reviews.AnyAsync(r => r.JobPostId == dto.JobPostId.Value);
+            if (alreadyReviewed) return BadRequest("You already reviewed this job.");
+
+            var review = new Review
+            {
+                CustomerId = userId,
+                ProviderId = completedApp.ProviderId,
+                JobPostId = jobPost.Id,
+                Rating = dto.Rating,
+                Comment = dto.Comment
+            };
+            _context.Reviews.Add(review);
+            await _context.SaveChangesAsync();
+            return Ok(review);
+        }
+
+        return BadRequest("Must provide BookingId or JobPostId.");
     }
 
     // GET reviews for a provider

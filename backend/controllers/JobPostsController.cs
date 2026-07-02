@@ -220,6 +220,30 @@ public class JobPostsController : ControllerBase
         return Ok();
     }
 
+    // ── PUT complete an application ──
+    [Authorize]
+    [HttpPut("{id}/applications/{appId}/complete")]
+    public async Task<IActionResult> Complete(Guid id, Guid appId)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var job = await _context.JobPosts
+            .Include(j => j.Applications)
+            .FirstOrDefaultAsync(j => j.Id == id);
+
+        if (job == null) return NotFound();
+        if (job.CustomerId != userId) return Forbid();
+
+        var app = job.Applications.FirstOrDefault(a => a.Id == appId);
+        if (app == null) return NotFound();
+
+        if (app.Status != "Accepted") return BadRequest("Only accepted applications can be marked as completed.");
+
+        app.Status = "Completed";
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
     // ── GET my posted jobs (customer) ──
     [Authorize]
     [HttpGet("my-posts")]

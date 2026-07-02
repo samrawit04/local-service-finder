@@ -13,16 +13,9 @@ public static class SeedData
 
         context.Database.Migrate();
 
-        // Only seed if our specific seed data doesn't exist yet
+        // Only seed demo data if it doesn't already exist.
+        // This check prevents wiping real user data on every restart.
         if (context.Users.Any(u => u.Email == "meron@example.com")) return;
-
-        // Clear out any old test data before seeding
-        context.Reviews.RemoveRange(context.Reviews);
-        context.Bookings.RemoveRange(context.Bookings);
-        context.Services.RemoveRange(context.Services);
-        context.ServiceProviders.RemoveRange(context.ServiceProviders);
-        context.Users.RemoveRange(context.Users);
-        context.SaveChanges();
 
         // ──────────────────────────────────────────────
         // CUSTOMERS (regular users who book services)

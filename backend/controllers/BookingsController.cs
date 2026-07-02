@@ -74,11 +74,33 @@ public class BookingsController : ControllerBase
     {
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        var booking = await _context.Bookings.Include(b => b.Provider).FirstOrDefaultAsync(b => b.Id == id);
-        if (booking == null) return NotFound();
-        if (booking.Provider.UserId != userId) return Forbid();
+        var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == id);
+        if (booking == null) return NotFound("Booking not found.");
 
-        booking.Status = dto.Status;
+        // We need the provider's UserId to check if the current user is the provider.
+        var provider = await _context.ServiceProviders.FirstOrDefaultAsync(p => p.Id == booking.ProviderId);
+
+        if (provider != null && provider.UserId == userId)
+        {
+            // Provider updating
+            booking.Status = dto.Status;
+        }
+        else if (booking.CustomerId == userId)
+        {
+            // Customer updating
+            if (dto.Status == "Completed" && booking.Status == "Accepted")
+            {
+                booking.Status = dto.Status;
+            }
+            else
+            {
+                return BadRequest($"Customers can only mark 'Accepted' bookings as completed. Current status is '{booking.Status}', attempted to set '{dto.Status}'.");
+            }
+        }
+        else
+        {
+            return Forbid();
+        }
         await _context.SaveChangesAsync();
         return Ok(booking);
     }
