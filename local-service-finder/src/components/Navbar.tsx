@@ -5,6 +5,7 @@ import {
     LogOut, Home, Compass, LayoutDashboard,
     Settings, UserCircle, UserCog, ChevronDown, Briefcase as BriefcaseIcon
 } from "lucide-react";
+import NotificationBell from "./NotificationBell";
 
 export default function Navbar() {
     const { user, logout } = useAuth();
@@ -71,8 +72,10 @@ export default function Navbar() {
 
                     <div className="nav-auth-section">
                         {user ? (
-                            /* ── Profile dropdown ── */
-                            <div ref={menuRef} style={{ position: "relative" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                                <NotificationBell />
+                                {/* ── Profile dropdown ── */}
+                                <div ref={menuRef} style={{ position: "relative" }}>
                                 <button
                                     onClick={() => setMenuOpen(prev => !prev)}
                                     className="nav-profile-badge"
@@ -121,6 +124,7 @@ export default function Navbar() {
                                         </button>
                                     </div>
                                 )}
+                                </div>
                             </div>
                         ) : (
                             <>

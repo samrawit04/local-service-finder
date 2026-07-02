@@ -63,6 +63,7 @@ export default function Dashboard() {
   const statusStyle = (s: string): [string, string] => {
     if (s === "Accepted") return ["badge badge-green",   s];
     if (s === "Rejected") return ["badge badge-red",     s];
+    if (s === "Completed") return ["badge badge-accent", s];
     return                       ["badge badge-gold",    s];
   };
 
@@ -181,11 +182,18 @@ export default function Dashboard() {
                           Scheduled: {new Date(b.date).toLocaleDateString("en-US",{ weekday:"short", month:"short", day:"numeric", year:"numeric" })}
                         </p>
                       </div>
-                      {b.status === "Accepted" && (
-                        <button className="btn btn-ghost" style={{ gap:6 }} onClick={() => setReviewingId(reviewingId === b.id ? null : b.id)}>
-                          <Star size={15}/> Leave Review
-                        </button>
-                      )}
+                      <div style={{ display:"flex", gap:10 }}>
+                        {b.status === "Accepted" && (
+                          <button className="btn btn-primary" style={{ padding:"8px 16px", fontSize:13 }} onClick={() => handleStatus(b.id, "Completed")}>
+                            <Check size={14}/> Mark Completed
+                          </button>
+                        )}
+                        {b.status === "Completed" && (
+                          <button className="btn btn-ghost" style={{ padding:"8px 16px", fontSize:13, gap:6 }} onClick={() => setReviewingId(reviewingId === b.id ? null : b.id)}>
+                            <Star size={14}/> Leave Review
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Review form */}

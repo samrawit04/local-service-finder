@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   Briefcase, MapPin, DollarSign, Calendar, Tag, Users,
   Clock, ArrowLeft, ChevronDown, CheckCircle, XCircle,
-  AlertCircle, Phone, User, FileText, Loader, Paperclip, ExternalLink
+  AlertCircle, Phone, User, FileText, Loader, Paperclip, ExternalLink, Star
 } from "lucide-react";
 
 interface Application {
@@ -47,8 +47,13 @@ export default function JobDetail() {
   const [cvFile, setCvFile]       = useState<File | null>(null);
   const [cvUrl, setCvUrl]         = useState("");
   const [applying, setApplying]   = useState(false);
-  const [applyError, setApplyError] = useState("");
-  const [applySuccess, setApplySuccess] = useState("");
+  const [applyError, setApplyError]   = useState("");
+  const [applySuccess, setApplySuccess]= useState("");
+
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [rating, setRating]           = useState(5);
+  const [comment, setComment]         = useState("");
+  const [hoverStar, setHoverStar]     = useState(0);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const cvInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,13 +124,28 @@ export default function JobDetail() {
 
   const handleReject = async (appId: string) => {
     setActionLoading(appId + "-reject");
+    try { await api.put(`/JobPosts/${id}/applications/${appId}/reject`); load(); }
+    catch { alert("Failed to reject application."); }
+    finally { setActionLoading(null); }
+  };
+
+  const handleComplete = async (appId: string) => {
+    setActionLoading(appId + "-complete");
+    try { await api.put(`/JobPosts/${id}/applications/${appId}/complete`); load(); }
+    catch { alert("Failed to mark application as completed."); }
+    finally { setActionLoading(null); }
+  };
+
+  const handleReview = async (e: React.FormEvent, appId: string) => {
+    e.preventDefault();
     try {
-      await api.put(`/JobPosts/${id}/applications/${appId}/reject`);
-      load();
-    } catch {
-      alert("Action failed.");
-    } finally {
-      setActionLoading(null);
+      await api.post("/Reviews", { jobPostId: id, rating, comment });
+      setReviewingId(null);
+      setComment("");
+      setRating(5);
+      alert("Review submitted! Thank you.");
+    } catch (err: any) {
+      alert(err.response?.data || "Failed to submit review.");
     }
   };
 
@@ -401,6 +421,77 @@ export default function JobDetail() {
                             : <><XCircle size={14} /> Reject</>
                           }
                         </button>
+                      </div>
+                    )}
+
+                    {/* Completion & Review Actions */}
+                    {job.status === "Closed" && app.status === "Accepted" && (
+                      <div style={{ display:"flex", gap:10, marginTop:10 }}>
+                        <button
+                          onClick={() => handleComplete(app.id)}
+                          className="btn btn-primary"
+                          style={{ padding:"8px 20px", fontSize:13 }}
+                          disabled={!!actionLoading}
+                        >
+                          {actionLoading === app.id + "-complete"
+                            ? <span className="login-spinner" />
+                            : <><CheckCircle size={14} /> Mark Completed</>
+                          }
+                        </button>
+                      </div>
+                    )}
+
+                    {job.status === "Closed" && app.status === "Completed" && (
+                      <div style={{ marginTop:10 }}>
+                        <button
+                          className="btn btn-ghost"
+                          style={{ gap:6, padding:"8px 20px", fontSize:13 }}
+                          onClick={() => setReviewingId(reviewingId === app.id ? null : app.id)}
+                        >
+                          <Star size={14}/> Leave Review
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Review Form */}
+                    {reviewingId === app.id && (
+                      <div style={{ marginTop:20, paddingTop:20, borderTop:"1px solid var(--border)", animation:"fadeIn .3s ease" }}>
+                        <h4 style={{ fontSize:16, marginBottom:16 }}>How was the work?</h4>
+                        <form onSubmit={e => handleReview(e, app.id)}>
+                          <div className="form-group">
+                            <label className="form-label">Rating</label>
+                            <div style={{ display:"flex", gap:6, marginBottom:4 }}>
+                              {[1,2,3,4,5].map(n => (
+                                <Star
+                                  key={n}
+                                  className="star"
+                                  size={28}
+                                  fill={(hoverStar || rating) >= n ? "#f59e0b" : "none"}
+                                  color={(hoverStar || rating) >= n ? "#f59e0b" : "var(--text-faint)"}
+                                  onMouseEnter={() => setHoverStar(n)}
+                                  onMouseLeave={() => setHoverStar(0)}
+                                  onClick={() => setRating(n)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Comment</label>
+                            <textarea
+                              className="form-input"
+                              rows={3}
+                              placeholder="Share your experience…"
+                              value={comment}
+                              onChange={e => setComment(e.target.value)}
+                              required
+                              style={{ resize:"vertical" }}
+                            />
+                          </div>
+                          <div style={{ display:"flex", gap:10 }}>
+                            <button type="submit" className="btn btn-primary"><CheckCircle size={15}/> Submit</button>
+                            <button type="button" className="btn btn-ghost" onClick={() => setReviewingId(null)}>Cancel</button>
+                          </div>
+                        </form>
                       </div>
                     )}
                   </div>
