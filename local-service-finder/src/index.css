@@ -1392,11 +1392,13 @@ p {
 /* ===================== CHAT PAGE ===================== */
 .chat-page {
   display: flex;
-  height: calc(100vh - 64px);
-  margin-top: 64px;
-  position: relative;
+  position: fixed;
+  top: 64px;       /* sit flush below the fixed navbar */
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 1;
-  overflow: hidden;
+  overflow: hidden; /* nothing leaks outside */
 }
 
 /* ── Sidebar ─────────────────────────────────────────── */
@@ -1828,4 +1830,5 @@ p {
   .chat-msg-row {
     max-width: 90%;
   }
-}
+}
+
