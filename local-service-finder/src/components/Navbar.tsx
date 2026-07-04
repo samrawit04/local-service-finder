@@ -3,15 +3,17 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
     LogOut, Home, Compass, LayoutDashboard,
-    UserCircle, UserCog, ChevronDown, Briefcase as BriefcaseIcon
+    UserCircle, UserCog, ChevronDown, Briefcase as BriefcaseIcon, MessageSquare
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
+import api from "../services/api";
 
 export default function Navbar() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [menuOpen, setMenuOpen] = useState(false);
+    const [chatUnread, setChatUnread] = useState(0);
     const menuRef = useRef<HTMLDivElement>(null);
 
     const handleLogout = () => {
@@ -33,6 +35,20 @@ export default function Navbar() {
         document.addEventListener("mousedown", handler);
         return () => document.removeEventListener("mousedown", handler);
     }, []);
+
+    // Poll unread chat count every 30s
+    useEffect(() => {
+        if (!user) return;
+        const fetchUnread = async () => {
+            try {
+                const { data } = await api.get<{ count: number }>("/Chat/unread-count");
+                setChatUnread(data.count);
+            } catch { /* silently fail */ }
+        };
+        fetchUnread();
+        const timer = setInterval(fetchUnread, 30_000);
+        return () => clearInterval(timer);
+    }, [user]);
 
     return (
         <nav className="navbar">
@@ -64,6 +80,24 @@ export default function Navbar() {
                             <Link to="/dashboard" className={isActive("/dashboard")}>
                                 <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                     <LayoutDashboard size={16} /> <span className="nav-link-text">Dashboard</span>
+                                </span>
+                            </Link>
+                        )}
+                        {user && (
+                            <Link
+                                to="/chat"
+                                className={isActive("/chat")}
+                                onClick={() => setChatUnread(0)}
+                                style={{ position: "relative" }}
+                            >
+                                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                    <MessageSquare size={16} />
+                                    <span className="nav-link-text">Chat</span>
+                                    {chatUnread > 0 && (
+                                        <span className="notif-badge" style={{ position: "static", transform: "none" }}>
+                                            {chatUnread > 99 ? "99+" : chatUnread}
+                                        </span>
+                                    )}
                                 </span>
                             </Link>
                         )}

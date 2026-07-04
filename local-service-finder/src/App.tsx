@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import UpdateProfile from "./pages/UpdateProfile";
 import JobBoard from "./pages/JobBoard";
 import JobDetail from "./pages/JobDetail";
+import Chat from "./pages/Chat";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/profile"          element={<UpdateProfile />} />
         <Route path="/jobs"             element={<JobBoard />} />
         <Route path="/jobs/:id"         element={<JobDetail />} />
+        <Route path="/chat"             element={<Chat />} />
         <Route path="/"                 element={<Navigate to="/login" />} />
       </Routes>
     </>

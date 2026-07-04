@@ -116,8 +116,23 @@ public class BookingsController : ControllerBase
 
             // Notify customer of status change
             if (dto.Status == "Accepted")
+            {
                 Notify(booking.CustomerId, "Booking Accepted ✓",
                     $"Your booking for \"{serviceName}\" has been accepted!", "booking_accepted");
+
+                // Create chat conversation if it doesn't already exist
+                var existingConv = await _context.ChatConversations
+                    .FirstOrDefaultAsync(c => c.BookingId == booking.Id);
+                if (existingConv == null)
+                {
+                    _context.ChatConversations.Add(new backend.Models.ChatConversation
+                    {
+                        BookingId     = booking.Id,
+                        ClientId      = booking.CustomerId,
+                        ProviderUserId = provider.UserId
+                    });
+                }
+            }
             else if (dto.Status == "Rejected")
                 Notify(booking.CustomerId, "Booking Rejected",
                     $"Unfortunately, your booking for \"{serviceName}\" was declined.", "booking_rejected");

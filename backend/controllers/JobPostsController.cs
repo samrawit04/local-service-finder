@@ -221,9 +221,24 @@ public class JobPostsController : ControllerBase
         var acceptedApp = job.Applications.First(a => a.Id == appId);
         var acceptedProvider = await _context.ServiceProviders.FindAsync(acceptedApp.ProviderId);
         if (acceptedProvider != null)
+        {
             Notify(acceptedProvider.UserId, "Application Accepted ✓",
                 $"Congratulations! Your application to \"{job.Title}\" has been accepted.",
                 "application_accepted");
+
+            // Create a chat conversation between the customer and the accepted provider
+            var existingConv = await _context.ChatConversations
+                .FirstOrDefaultAsync(c => c.JobApplicationId == appId);
+            if (existingConv == null)
+            {
+                _context.ChatConversations.Add(new backend.Models.ChatConversation
+                {
+                    JobApplicationId = appId,
+                    ClientId         = job.CustomerId,
+                    ProviderUserId   = acceptedProvider.UserId
+                });
+            }
+        }
 
         // Notify rejected providers
         foreach (var a in job.Applications.Where(a => a.Id != appId))
