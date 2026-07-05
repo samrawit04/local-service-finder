@@ -45,6 +45,9 @@ function fmtTime(d: string) {
   return new Date(d).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
+const BASE_URL = (import.meta.env.VITE_API_URL as string || "")
+  .replace(/\/api$/, "");
+
 function isSameUser(id1?: string, id2?: string) {
   if (!id1 || !id2) return false;
   return id1.toLowerCase() === id2.toLowerCase();
@@ -276,7 +279,11 @@ export default function Chat() {
             <MessageCircle size={20} />
             Messages
           </h2>
-          {!connected && <Loader2 size={16} className="chat-spinner" title="Connecting…" />}
+          {!connected && (
+            <div title="Connecting…">
+              <Loader2 size={16} className="chat-spinner" />
+            </div>
+          )}
         </div>
 
         {loadingConvs ? (
