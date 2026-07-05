@@ -47,7 +47,16 @@ export default function Navbar() {
         };
         fetchUnread();
         const timer = setInterval(fetchUnread, 30_000);
-        return () => clearInterval(timer);
+
+        // Chat page fires this event the moment the user reads a conversation,
+        // so the badge clears instantly without waiting for the next poll.
+        const onChatRead = () => setChatUnread(0);
+        window.addEventListener("chatUnreadReset", onChatRead);
+
+        return () => {
+            clearInterval(timer);
+            window.removeEventListener("chatUnreadReset", onChatRead);
+        };
     }, [user]);
 
     return (

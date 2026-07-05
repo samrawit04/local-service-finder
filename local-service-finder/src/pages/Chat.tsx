@@ -48,6 +48,11 @@ function fmtTime(d: string) {
 const BASE_URL = (import.meta.env.VITE_API_URL as string || "")
   .replace(/\/api$/, "");
 
+/** Tell the Navbar to immediately reset its chat unread badge to 0. */
+function signalNavbarChatRead() {
+  window.dispatchEvent(new CustomEvent("chatUnreadReset"));
+}
+
 /* ── Component ───────────────────────────────────────────────── */
 export default function Chat() {
   const { user } = useAuth();
@@ -59,12 +64,20 @@ export default function Chat() {
   const [draft,         setDraft]         = useState("");
   const [loadingConvs,  setLoadingConvs]  = useState(true);
   const [loadingMsgs,   setLoadingMsgs]   = useState(false);
-  const [connecting,    setConnecting]    = useState(false);
+  const [connected,     setConnected]     = useState(false);
   const [mobileView,    setMobileView]    = useState<"list" | "chat">("list");
 
-  const hubRef       = useRef<signalR.HubConnection | null>(null);
-  const messagesEnd  = useRef<HTMLDivElement | null>(null);
-  const inputRef     = useRef<HTMLTextAreaElement | null>(null);
+  // Refs — used inside SignalR callbacks to avoid stale closures without
+  // rebuilding the connection every time state changes.
+  const hubRef          = useRef<signalR.HubConnection | null>(null);
+  const activeConvRef   = useRef<Conversation | null>(null);
+  const userIdRef       = useRef<string | undefined>(user?.id);
+  const messagesEnd     = useRef<HTMLDivElement | null>(null);
+  const inputRef        = useRef<HTMLTextAreaElement | null>(null);
+
+  // Keep refs in sync with state
+  useEffect(() => { activeConvRef.current = activeConv; }, [activeConv]);
+  useEffect(() => { userIdRef.current     = user?.id;   }, [user?.id]);
 
   /* ── Redirect if not logged in ── */
   useEffect(() => {
@@ -82,14 +95,16 @@ export default function Chat() {
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
-  /* ── Build SignalR connection ── */
+  /* ── Build SignalR connection ONCE per user session ──
+     IMPORTANT: activeConv is intentionally NOT in the dependency array.
+     Stale closure is avoided by reading activeConvRef.current inside callbacks. */
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) return;
+    if (!token || !user) return;
 
     const conn = new signalR.HubConnectionBuilder()
       .withUrl(`${BASE_URL}/hubs/chat`, {
-        accessTokenFactory: () => token,
+        accessTokenFactory: () => localStorage.getItem("token") ?? token,
         transport: signalR.HttpTransportType.WebSockets,
         skipNegotiation: true,
       })
@@ -97,40 +112,86 @@ export default function Chat() {
       .configureLogging(signalR.LogLevel.Warning)
       .build();
 
+    // ── Incoming message ──
     conn.on("ReceiveMessage", (msg: ChatMessage) => {
-      // Add message to active conversation
+      const currentConv  = activeConvRef.current;
+      const currentUid   = userIdRef.current;
+      const isActiveConv = currentConv?.id === msg.conversationId;
+
+      // Replace any matching optimistic message, or append
       setMessages(prev => {
-        if (prev.some(m => m.id === msg.id)) return prev;
-        return [...prev, msg];
+        const withoutOptimistic = prev.filter(m =>
+          !(m.id.startsWith("opt-") &&
+            m.senderId === msg.senderId &&
+            m.content  === msg.content)
+        );
+        if (withoutOptimistic.some(m => m.id === msg.id)) return withoutOptimistic;
+        return [...withoutOptimistic, msg];
       });
-      // Update last message preview in sidebar
-      setConversations(prev => prev.map(c =>
-        c.id === msg.conversationId
-          ? {
-              ...c,
-              lastMessage: { content: msg.content, sentAt: msg.sentAt, senderId: msg.senderId },
-              unreadCount: msg.senderId !== user?.id
-                ? (activeConv?.id === msg.conversationId ? 0 : c.unreadCount + 1)
-                : c.unreadCount
-            }
-          : c
-      ));
+
+      // Update sidebar preview + unread count
+      setConversations(prev => prev.map(c => {
+        if (c.id !== msg.conversationId) return c;
+        const incoming  = msg.senderId !== currentUid;
+        const newUnread = incoming && !isActiveConv ? c.unreadCount + 1 : c.unreadCount;
+        return {
+          ...c,
+          lastMessage: { content: msg.content, sentAt: msg.sentAt, senderId: msg.senderId },
+          unreadCount: newUnread,
+        };
+      }));
     });
 
-    conn.on("MessagesRead", ({ conversationId }: { conversationId: string; readById: string }) => {
+    // ── Read receipts ──
+    conn.on("MessagesRead", ({ conversationId }: { conversationId: string }) => {
       setMessages(prev =>
         prev.map(m => m.conversationId === conversationId ? { ...m, isRead: true } : m)
       );
     });
 
-    setConnecting(true);
-    conn.start()
-      .then(() => { setConnecting(false); })
-      .catch(() => { setConnecting(false); });
+    // ── Reconnect: re-join active conversation ──
+    conn.onreconnected(async () => {
+      setConnected(true);
+      const conv = activeConvRef.current;
+      if (conv) {
+        await conn.invoke("JoinConversation", conv.id).catch(() => {});
+      }
+    });
+
+    conn.onclose(() => setConnected(false));
 
     hubRef.current = conn;
+
+    conn.start()
+      .then(() => { setConnected(true); })
+      .catch(() => { setConnected(false); });
+
     return () => { conn.stop(); };
-  }, [user?.id, activeConv?.id]);
+  }, [user?.id]); // ← Only rebuilt when user changes, NOT on conversation change
+
+  /* ── Join/leave conversation groups when activeConv changes ── */
+  useEffect(() => {
+    const hub  = hubRef.current;
+    const conv = activeConv;
+    if (!hub || !conv) return;
+
+    const joinWhenReady = async () => {
+      // Wait until connected (in case this runs during startup)
+      if (hub.state !== signalR.HubConnectionState.Connected) return;
+      await hub.invoke("JoinConversation", conv.id).catch(() => {});
+      await hub.invoke("MarkRead", conv.id).catch(() => {});
+      // Tell the Navbar to immediately clear its unread badge
+      signalNavbarChatRead();
+    };
+
+    joinWhenReady();
+
+    return () => {
+      if (hub.state === signalR.HubConnectionState.Connected) {
+        hub.invoke("LeaveConversation", conv.id).catch(() => {});
+      }
+    };
+  }, [activeConv?.id]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Select a conversation ── */
   const openConversation = useCallback(async (conv: Conversation) => {
@@ -139,41 +200,59 @@ export default function Chat() {
     setLoadingMsgs(true);
     setMobileView("chat");
 
-    // Leave old group, join new one
-    const hub = hubRef.current;
-    if (hub?.state === signalR.HubConnectionState.Connected) {
-      if (activeConv) await hub.invoke("LeaveConversation", activeConv.id).catch(() => {});
-      await hub.invoke("JoinConversation", conv.id).catch(() => {});
-      await hub.invoke("MarkRead", conv.id).catch(() => {});
-    }
-
-    // Mark local unread count as 0
+    // Immediately clear unread count in sidebar
     setConversations(prev =>
       prev.map(c => c.id === conv.id ? { ...c, unreadCount: 0 } : c)
     );
+
+    // Also tell Navbar to reset its badge
+    signalNavbarChatRead();
 
     try {
       const { data } = await api.get<ChatMessage[]>(`/Chat/conversations/${conv.id}/messages`);
       setMessages(data);
     } catch { /* silently fail */ }
     finally  { setLoadingMsgs(false); }
-  }, [activeConv]);
+  }, []);
 
   /* ── Scroll to bottom when messages change ── */
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* ── Send message ── */
+  /* ── Send message with optimistic UI ── */
   const sendMessage = async () => {
     const content = draft.trim();
-    if (!content || !activeConv || hubRef.current?.state !== signalR.HubConnectionState.Connected) return;
+    if (!content || !activeConv || !user) return;
 
     setDraft("");
+
+    // Add optimistic message immediately so it appears without waiting for server
+    const optimisticId = `opt-${Date.now()}`;
+    const optimisticMsg: ChatMessage = {
+      id:             optimisticId,
+      conversationId: activeConv.id,
+      senderId:       user.id,
+      senderName:     user.name,
+      content,
+      sentAt:         new Date().toISOString(),
+      isRead:         false,
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+
     try {
-      await hubRef.current!.invoke("SendMessage", activeConv.id, content);
+      const hub = hubRef.current;
+      if (hub?.state === signalR.HubConnectionState.Connected) {
+        await hub.invoke("SendMessage", activeConv.id, content);
+        // Server will broadcast ReceiveMessage which replaces the optimistic entry
+      } else {
+        // Hub not connected — remove optimistic and restore draft
+        setMessages(prev => prev.filter(m => m.id !== optimisticId));
+        setDraft(content);
+      }
     } catch {
-      setDraft(content); // restore if failed
+      setMessages(prev => prev.filter(m => m.id !== optimisticId));
+      setDraft(content);
     }
   };
 
@@ -196,7 +275,7 @@ export default function Chat() {
             <MessageCircle size={20} />
             Messages
           </h2>
-          {connecting && <Loader2 size={16} className="chat-spinner" />}
+          {!connected && <Loader2 size={16} className="chat-spinner" title="Connecting…" />}
         </div>
 
         {loadingConvs ? (
@@ -276,9 +355,7 @@ export default function Chat() {
                 <div className="chat-panel-name">{activeConv.otherUser.name}</div>
                 <div className="chat-panel-subject">{activeConv.subject}</div>
               </div>
-              {hubRef.current?.state === signalR.HubConnectionState.Connected && (
-                <span className="chat-online-dot" title="Connected" />
-              )}
+              {connected && <span className="chat-online-dot" title="Connected" />}
             </div>
 
             {/* Messages */}
@@ -296,12 +373,14 @@ export default function Chat() {
               ) : (
                 messages.map((msg, idx) => {
                   const isMine = msg.senderId === user.id;
+                  const isOptimistic = msg.id.startsWith("opt-");
                   const showAvatar =
                     idx === 0 || messages[idx - 1].senderId !== msg.senderId;
                   return (
                     <div
                       key={msg.id}
                       className={`chat-msg-row ${isMine ? "chat-msg-row--mine" : ""}`}
+                      style={{ opacity: isOptimistic ? 0.7 : 1 }}
                     >
                       {!isMine && (
                         <div
@@ -320,7 +399,7 @@ export default function Chat() {
                         </div>
                         <div className={`chat-msg-meta ${isMine ? "chat-msg-meta--mine" : ""}`}>
                           <span>{fmtTime(msg.sentAt)}</span>
-                          {isMine && (
+                          {isMine && !isOptimistic && (
                             <CheckCheck
                               size={13}
                               style={{ color: msg.isRead ? "var(--teal)" : "var(--text-faint)" }}
@@ -349,7 +428,7 @@ export default function Chat() {
               <button
                 className="chat-send-btn"
                 onClick={sendMessage}
-                disabled={!draft.trim() || hubRef.current?.state !== signalR.HubConnectionState.Connected}
+                disabled={!draft.trim()}
                 aria-label="Send message"
               >
                 <Send size={18} />
