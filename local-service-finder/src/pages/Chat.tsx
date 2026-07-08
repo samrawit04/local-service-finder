@@ -119,6 +119,10 @@ export default function Chat() {
   const localStreamRef  = useRef<MediaStream | null>(null);
   const localVideoRef   = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef  = useRef<HTMLVideoElement | null>(null);
+  // Holds an SDP offer that arrived before acceptCall() finished setting up the peer
+  const pendingOfferRef          = useRef<string | null>(null);
+  // Buffers ICE candidates that arrive before setRemoteDescription is called
+  const pendingIceCandidatesRef  = useRef<RTCIceCandidateInit[]>([]);
 
   // Tracking refs for call logs
   const callStartTimeRef = useRef<number | null>(null);
@@ -163,6 +167,8 @@ export default function Chat() {
   const closePeer = useCallback(() => {
     peerRef.current?.close();
     peerRef.current = null;
+    pendingOfferRef.current         = null; // discard any buffered offer from the previous call
+    pendingIceCandidatesRef.current = [];   // discard any buffered ICE candidates
     localStreamRef.current?.getTracks().forEach(t => t.stop());
     localStreamRef.current = null;
     if (localVideoRef.current)  localVideoRef.current.srcObject  = null;
@@ -254,8 +260,6 @@ export default function Chat() {
     setIncomingCall(null);
     callConvIdRef.current = info.conversationId;
 
-    // We need to wait for the offer, which arrives via ReceiveOffer
-    // So just set up the peer connection and stream here — the offer handler will complete it
     try {
       const stream = await startLocalStream(info.callType);
       const peer   = createPeer(async (candidate) => {
@@ -263,6 +267,24 @@ export default function Chat() {
       });
       peerRef.current = peer;
       stream.getTracks().forEach(t => peer.addTrack(t, stream));
+
+      // If the SDP offer already arrived before the peer was ready, process it now
+      const pendingSdp = pendingOfferRef.current;
+      if (pendingSdp) {
+        pendingOfferRef.current = null;
+        try {
+          const offer = JSON.parse(pendingSdp) as RTCSessionDescriptionInit;
+          await peer.setRemoteDescription(new RTCSessionDescription(offer));
+          // Flush ICE candidates that arrived before remote description was ready
+          for (const ic of pendingIceCandidatesRef.current) {
+            await peer.addIceCandidate(new RTCIceCandidate(ic)).catch(() => {});
+          }
+          pendingIceCandidatesRef.current = [];
+          const answer = await peer.createAnswer();
+          await peer.setLocalDescription(answer);
+          await hub.invoke("SendAnswer", info.conversationId, JSON.stringify(answer));
+        } catch { /* ignore */ }
+      }
     } catch {
       closePeer();
       setCallState("idle");
@@ -329,17 +351,27 @@ export default function Chat() {
 
     // ── WebRTC: Receive SDP offer (callee side) ──
     conn.on("ReceiveOffer", async ({ sdpOffer }: { sdpOffer: string }) => {
-      const peer = peerRef.current;
-      const hub  = hubRef.current;
-      const conv = activeConvRef.current;
-      if (!peer || !hub || !conv) return;
+      const peer  = peerRef.current;
+      const hub   = hubRef.current;
+      const convId = callConvIdRef.current;
+
+      // If peer isn't ready yet (acceptCall still running), store the offer for later
+      if (!peer || !hub || !convId) {
+        pendingOfferRef.current = sdpOffer;
+        return;
+      }
 
       try {
         const offer = JSON.parse(sdpOffer) as RTCSessionDescriptionInit;
         await peer.setRemoteDescription(new RTCSessionDescription(offer));
+        // Flush any ICE candidates that arrived before the remote description was ready
+        for (const ic of pendingIceCandidatesRef.current) {
+          await peer.addIceCandidate(new RTCIceCandidate(ic)).catch(() => {});
+        }
+        pendingIceCandidatesRef.current = [];
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
-        await hub.invoke("SendAnswer", conv.id, JSON.stringify(answer));
+        await hub.invoke("SendAnswer", convId, JSON.stringify(answer));
         setCallState("active");
       } catch { /* ignore */ }
     });
@@ -351,6 +383,11 @@ export default function Chat() {
       try {
         const answer = JSON.parse(sdpAnswer) as RTCSessionDescriptionInit;
         await peer.setRemoteDescription(new RTCSessionDescription(answer));
+        // Flush any ICE candidates that arrived before the remote description was ready
+        for (const ic of pendingIceCandidatesRef.current) {
+          await peer.addIceCandidate(new RTCIceCandidate(ic)).catch(() => {});
+        }
+        pendingIceCandidatesRef.current = [];
         setCallState("active");
       } catch { /* ignore */ }
     });
@@ -361,7 +398,12 @@ export default function Chat() {
       if (!peer) return;
       try {
         const ic = JSON.parse(candidate) as RTCIceCandidateInit;
-        await peer.addIceCandidate(new RTCIceCandidate(ic));
+        // Buffer the candidate if remote description isn't set yet
+        if (!peer.remoteDescription) {
+          pendingIceCandidatesRef.current.push(ic);
+        } else {
+          await peer.addIceCandidate(new RTCIceCandidate(ic));
+        }
       } catch { /* ignore */ }
     });
 
