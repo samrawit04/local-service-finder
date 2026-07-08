@@ -13,7 +13,14 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "https://connexerv-pied.vercel.app","https://connexerv-2tchzazg3.vercel.app")
+        policy.WithOrigins(
+                  "http://localhost:5173", 
+                  "http://localhost:5174", 
+                  "https://connexerv-pied.vercel.app",
+                  "https://connexerv-2tchzazg3.vercel.app",
+                  "https://local-service-finder-pied.vercel.app",
+                  "https://local-service-finder-2tchzazg3.vercel.app"
+              )
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // Required for SignalR WebSocket handshake
