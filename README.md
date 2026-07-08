@@ -1,235 +1,95 @@
 # Connexerv
 
-> Connecting people with trusted local service providers in Addis Ababa.
+Connexerv is a full-stack service marketplace that connects customers with trusted local service providers in Addis Ababa. Customers can find providers, book services, post jobs, and communicate through real-time messaging, voice, and video calls.
 
-**Live Demo:** [connexerv.vercel.app](https://connexerv-pied.vercel.app/)  
-**GitHub:** [github.com/samrawit04/Connexerv](https://github.com/samrawit04/Connexerv)
+## 🚀 Live Demo
 
----
+**Website:** [https://connexerv.vercel](https://local-service-finder-pied.vercel.app/)
 
-## What is Connexerv?
+## Screenshoot
+<img width="1870" height="875" alt="Screenshot 2026-07-08 205512" src="https://github.com/user-attachments/assets/4513cbf7-5d2e-4d24-a103-7fc9dde4abb3" />
 
-Connexerv is a full-stack service marketplace platform built for the local Ethiopian market. It bridges the gap between customers looking for reliable service providers — plumbers, cleaners, tutors, electricians — and skilled professionals looking for work.
+<img width="1832" height="870" alt="Screenshot 2026-07-08 205550" src="https://github.com/user-attachments/assets/690f7bfb-5b15-43ee-bcad-f90f9fc324ad" />
 
-Beyond a simple listing platform, Connexerv includes a real-time communication system with text, voice, file sharing, and video calling — making it a complete end-to-end solution for finding, booking, and communicating with service providers.
+<img width="1891" height="866" alt="Screenshot 2026-07-08 205654" src="https://github.com/user-attachments/assets/c1dacf5b-f0eb-4dc0-bf8f-39401a1a9cfd" />
 
----
+<img width="1848" height="857" alt="Screenshot 2026-07-08 205724" src="https://github.com/user-attachments/assets/37a277a4-48b1-4351-b52a-7b47b2161c8c" />
 
-## Features
 
-### Authentication & Users
-- JWT-based authentication with role-based access (Customer / Provider)
-- Secure password hashing with BCrypt
-- Persistent sessions with token storage
-
-### Service Providers
-- Providers create and manage their service profiles
-- Categorized service listings with descriptions
-- Location-based search and filtering
-
-### Job Posting
-- Customers post jobs they need done
-- Providers browse and apply for jobs that match their skills
-- Full application management flow
-
-### Booking System
-- Customers book services directly from provider profiles
-- Providers accept or reject booking requests
-- Booking status tracking (Pending / Accepted / Rejected)
-
-### Reviews & Ratings
-- Customers leave reviews after completed bookings
-- Star ratings visible on provider profiles
-- Review system tied to verified bookings only
-
-### Notifications
-- Real-time notifications for booking updates, job applications, and messages
-- Notification center with read/unread status
-
-### Real-Time Chat
-- Text messaging between customers and providers
-- Voice message recording and playback
-- File and image attachments
-- Voice calls
-- Video calls
-- Powered by SignalR
-
----
-
-## Tech Stack
+## 💻 Tech Stack
 
 ### Frontend
-| Technology | Purpose |
-|------------|---------|
-| React + TypeScript | UI framework |
-| Vite | Build tool |
-| React Router | Client-side routing |
-| Axios | API communication |
-| Cloudinary | File and media storage |
+
+* React
+* TypeScript
+* Vite
+* React Router
+* Axios
 
 ### Backend
-| Technology | Purpose |
-|------------|---------|
-| ASP.NET Core | Web API framework |
-| Entity Framework Core | ORM / database access |
-| PostgreSQL | Relational database |
-| SignalR | Real-time communication |
-| JWT | Authentication |
-| BCrypt | Password hashing |
 
-### Infrastructure
-| Service | Purpose |
-|---------|---------|
-| Vercel | Frontend deployment |
-| Render | Backend deployment |
-| Neon | Managed PostgreSQL database |
-| Cloudinary | Media storage |
+* ASP.NET Core Web API
+* Entity Framework Core
+* PostgreSQL
+* SignalR
+* JWT Authentication
+* BCrypt
 
----
+### Services
 
-## Architecture
+* Cloudinary (Media Storage)
+* Vercel (Frontend Hosting)
+* Render (Backend Hosting)
+* Neon (PostgreSQL)
 
-```
-┌─────────────────────┐         ┌──────────────────────┐
-│   React Frontend    │ ──────► │  ASP.NET Core API    │
-│   (Vercel)          │ ◄────── │  (Render)            │
-└─────────────────────┘         └──────────┬───────────┘
-                                           │
-                                           ▼
-                                ┌──────────────────────┐
-                                │  PostgreSQL (Neon)   │
-                                └──────────────────────┘
-                                           │
-                                           ▼
-                                ┌──────────────────────┐
-                                │  Cloudinary          │
-                                │  (Media Storage)     │
-                                └──────────────────────┘
-```
+## ✨ Features
 
----
+* User authentication with JWT
+* Customer & provider roles
+* Provider profiles and service listings
+* Job posting and applications
+* Booking management
+* Reviews and ratings
+* Real-time chat
+* Voice & video calls
+* File and image sharing
+* Notifications
 
-## Database Models
+## 📂 Project Structure
 
-- **User** — authentication, roles
-- **ServiceProvider** — provider profile linked to user
-- **Service** — individual service listings by providers
-- **Booking** — customer-provider booking transactions
-- **Review** — post-booking ratings and comments
-- **JobPost** — customer job requests
-- **JobApplication** — provider applications to job posts
-- **Notification** — system and user notifications
-- **ChatMessage** — real-time messages with media support
+* **Frontend:** React + TypeScript
+* **Backend:** ASP.NET Core Web API
+* **Database:** PostgreSQL
 
----
+## 🛠️ Run Locally
 
-## Getting Started
+### Backend
 
-### Prerequisites
-- Node.js 18+
-- .NET 10 SDK
-- PostgreSQL (or Neon account)
-
-### Clone the repository
-```bash
-git clone https://github.com/samrawit04/Connexerv.git
-cd Connexerv
-```
-
-### Backend setup
 ```bash
 cd backend
-```
-
-Create `appsettings.json`:
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "your_postgresql_connection_string"
-  },
-  "Jwt": {
-    "Key": "your_secret_key_min_32_characters",
-    "Issuer": "Connexerv",
-    "Audience": "ConnexervUsers"
-  }
-}
-```
-
-Run migrations and start:
-```bash
 dotnet ef database update
 dotnet run
 ```
 
-### Frontend setup
+### Frontend
+
 ```bash
 cd frontend
 npm install
-```
-
-Create `.env`:
-```
-VITE_API_URL=http://localhost:5202/api
-```
-
-Start:
-```bash
 npm run dev
 ```
 
----
+## 📌 Roadmap
 
-## API Endpoints
+* Map integration
+* Chapa payment integration
+* React Native mobile app
+* Admin dashboard
+* Provider analytics
 
-### Auth
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/Auth/register` | Register new user |
-| POST | `/api/Auth/login` | Login and get JWT |
+## 👩‍💻 Author
 
-### Providers
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/Providers` | List all providers |
-| GET | `/api/Providers/{id}` | Get provider details |
-| POST | `/api/Providers` | Create provider profile |
-| PUT | `/api/Providers/{id}` | Update provider profile |
+**Samrawit Amare**
 
-### Services
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/Services` | List all services |
-| POST | `/api/Services` | Create a service listing |
-| PUT | `/api/Services/{id}` | Update a service |
-| DELETE | `/api/Services/{id}` | Delete a service |
-
-### Bookings
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/Bookings` | Create a booking |
-| GET | `/api/Bookings/my` | Get my bookings |
-| PUT | `/api/Bookings/{id}/status` | Accept or reject booking |
-
-### Reviews
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/Reviews` | Leave a review |
-| GET | `/api/Reviews/{providerId}` | Get provider reviews |
-
----
-
-## Roadmap
-
-- [ ] Map integration — show providers on Addis Ababa map
-- [ ] Chapa payment integration (Ethiopian payment gateway)
-- [ ] Mobile app (React Native)
-- [ ] Provider analytics dashboard
-- [ ] Admin panel for platform management
-
----
-
-## Author
-
-**Samrawit Amare**  
-Full-Stack Developer  
-[LinkedIn](https://www.linkedin.com/in/samrawitamare/) • [GitHub](https://github.com/samrawit04)
+* GitHub: https://github.com/samrawit04
+* LinkedIn: https://www.linkedin.com/in/samrawit-amare/
